@@ -104,7 +104,7 @@ const t = (key: string, params?: { pattern?: string }) =>
 describe('client module', () => {
   it('registers under the published package id', () => {
     expect(loaded.length).toBe(1)
-    expect(loaded[0].id).toBe('@yukieiji/command-permission')
+    expect(loaded[0].id).toBe('@yukieiji/dsh-command-permission')
   })
 
   it('registers the approval detail at shadowing priority and the shell overlay', () => {

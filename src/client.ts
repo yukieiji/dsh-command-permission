@@ -35,7 +35,7 @@ declare global {
 }
 
 window.__ModuleLoader__.load({
-  id: '@yukieiji/command-permission',
+  id: '@yukieiji/dsh-command-permission',
   factory(require) {
     const React: any = require('react')
     const h: (...args: any[]) => any = React.createElement

@@ -1,4 +1,4 @@
-# @yukieiji/command-permission
+# @yukieiji/dsh-command-permission
 
 DSH の承認（エスカレーション）まわりに、次の2つの機能を足すプラグインです。
 
