@@ -96,7 +96,7 @@ Plugin Manager → 追加 → **パス指定**でそのフォルダを指定 →
 
 ```bash
 pnpm install
-pnpm build   # tsc -p . → dist/
+pnpm build   # tsc -p . → dist/、rolldown で src/client.ts を dist/client.js にバンドル
 pnpm lint    # oxlint（curly 必須 = 波括弧なし if はエラー）
 pnpm test    # vitest（ホスト30 + クライアント11 = 41 テスト）
 pnpm check   # build + lint + test まとめて
@@ -105,6 +105,11 @@ pnpm check   # build + lint + test まとめて
 - `src/index.ts` — ホスト側。`approval/request` の prepend リスナーと `/cmdperm` コマンド
 - `src/client.ts` — クライアント側。承認詳細のスロット（priority -1 で既存表示をシャドウ）と
   ワークスペース右クリックメニュー/ダイアログ
+- `scripts/build-client.mjs` — クライアント成果物のバンドル。ブラウザのモジュールテーブルは
+  `react` しか知らないので、実行時依存の **zod は rolldown で成果物にインライン**する
+  （`react` だけはファクトリーの `require` 経由のまま）
+- すべての JSON 境界（設定ファイル・`/cmdperm` 保存ペイロード・tool 呼び出し引数・
+  コマンド結果）は **zod スキーマ**でパースし、不正形は空に劣化させる
 - `tests/` — vitest。ホストは fake ctx、クライアントは fake React/`__ModuleLoader__` で実行
 
 ## 制限事項

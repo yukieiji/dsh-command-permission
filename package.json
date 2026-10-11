@@ -34,8 +34,8 @@
     "LICENSE"
   ],
   "scripts": {
-    "prepare": "tsc -p .",
-    "build": "tsc -p .",
+    "prepare": "npm run build",
+    "build": "tsc -p . && node scripts/build-client.mjs",
     "lint": "oxlint .",
     "test": "vitest run",
     "check": "npm run build && npm run lint && npm run test"

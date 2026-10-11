@@ -125,9 +125,9 @@ describe('matchesPattern', () => {
 })
 
 describe('sanitizeLists', () => {
-  it('keeps non-empty strings and drops everything else', () => {
+  it('keeps non-empty strings, trims them, and drops everything else', () => {
     expect(sanitizeLists({ allow: ['uv run', '', 1, null, ' git status '], deny: 'nope' }))
-      .toEqual({ allow: ['uv run', ' git status '], deny: [], session: {} })
+      .toEqual({ allow: ['uv run', 'git status'], deny: [], session: {} })
   })
 
   it('keeps well-formed session maps and drops empty entries', () => {
@@ -135,9 +135,10 @@ describe('sanitizeLists', () => {
       .toEqual({ allow: [], deny: [], session: { s1: ['uv *'] } })
   })
 
-  it('survives non-object documents', () => {
+  it('survives non-object documents and malformed fields', () => {
     expect(sanitizeLists(null)).toEqual({ allow: [], deny: [], session: {} })
     expect(sanitizeLists('allow')).toEqual({ allow: [], deny: [], session: {} })
+    expect(sanitizeLists({ allow: 'uv run', session: 'nope' })).toEqual({ allow: [], deny: [], session: {} })
   })
 })
 

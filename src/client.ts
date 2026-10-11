@@ -150,7 +150,7 @@ window.__ModuleLoader__.load({
     let ctx: any
 
     /** Run one /cmdperm line against the session currently open in the main view. */
-    async function runCommand(noSessionMessage: string, line: string): Promise<any> {
+    async function runCommand(noSessionMessage: string, line: string): Promise<unknown> {
       const list = ctx.sessions.list.getSnapshot()
       const carrier = Object.values(list.byId as Record<string, any>)
         .find((session: any) => (session.retainedBy?.mainView ?? 0) > 0)
@@ -262,9 +262,12 @@ window.__ModuleLoader__.load({
         setMenu(null)
         setDialog({ ...target, allow: '', deny: '', error: '', busy: true })
         try {
-          const payload = await runCommand(t('dialog.noSession'), `/cmdperm workspace ${target.workspaceId} list`)
+          const payload: unknown = await runCommand(t('dialog.noSession'), `/cmdperm workspace ${target.workspaceId} list`)
+          const parsed = CommandPayloadSchema.safeParse(payload)
+          const allow = parsed.success ? parsed.data.allow : []
+          const deny = parsed.success ? parsed.data.deny : []
           setDialog((current: any) => current !== null && current.workspaceId === target.workspaceId
-            ? { ...current, allow: (payload.allow ?? []).join('\n'), deny: (payload.deny ?? []).join('\n'), busy: false }
+            ? { ...current, allow: allow.join('\n'), deny: deny.join('\n'), busy: false }
             : current)
         } catch (cause: any) {
           setDialog((current: any) => current !== null && current.workspaceId === target.workspaceId
@@ -435,5 +438,3 @@ window.__ModuleLoader__.load({
     }
   },
 })
-
-export {}
