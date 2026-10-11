@@ -1,0 +1,66 @@
+{
+  "name": "@yukieiji/command-permission",
+  "version": "0.2.0",
+  "type": "module",
+  "license": "MIT",
+  "author": "yukieiji",
+  "description": "DSH plugin: one-click session/workspace command allow patterns on approval prompts, plus per-workspace allow/deny lists edited from the sidebar right-click menu.",
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "cordis",
+    "approval",
+    "permissions"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yukieiji/dsh-command-permission.git"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "exports": {
+    ".": "./dist/index.js",
+    "./client": "./dist/client.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "files": [
+    "dist",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "icon.svg",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "prepare": "tsc -p .",
+    "build": "tsc -p .",
+    "lint": "oxlint .",
+    "test": "vitest run",
+    "check": "npm run build && npm run lint && npm run test"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.0",
+    "oxlint": "^1.81.0",
+    "rolldown": "^1.2.13",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.11"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-approval",
+        "@deepseek-ai/dsh-client-ui-layout"
+      ]
+    }
+  },
+  "dependencies": {
+    "zod": "^4.6.5"
+  }
+}

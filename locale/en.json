@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Command Permission",
+    "description": "Approval prompts gain one-click session-scoped command allow patterns (exact / prefix / command word), and each workspace gets an allow/deny list edited from its sidebar right-click menu."
+  }
+}

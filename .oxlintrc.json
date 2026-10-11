@@ -1,0 +1,18 @@
+{
+  "ignorePatterns": ["dist", "node_modules"],
+  "categories": {
+    "correctness": "error"
+  },
+  "env": {
+    "builtin": true
+  },
+  "rules": {
+    "curly": ["error", "all"],
+    "eqeqeq": ["error", "smart"],
+    "no-var": "error",
+    "prefer-const": "error",
+    "no-unused-vars": ["error", { "argsIgnorePattern": "^_", "varsIgnorePattern": "^_", "caughtErrorsIgnorePattern": "^_" }],
+    "no-empty": "error",
+    "typescript/no-explicit-any": "off"
+  }
+}
