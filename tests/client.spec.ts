@@ -62,7 +62,7 @@ function createClient(options: {
           if (options.execute !== undefined) {
             return options.execute(sessionId, line)
           }
-          return { result: { kind: 'success', text: JSON.stringify({ allow: ['uv run'], deny: [] }) } }
+          return { ok: true, value: { result: { kind: 'success', text: JSON.stringify({ allow: ['uv run'], deny: [] }) } } }
         },
       },
     },
@@ -220,9 +220,23 @@ describe('client module', () => {
 
   it('surfaces a failed command as a rejection', async () => {
     const { registrations } = createClient({
-      execute: async () => ({ result: { kind: 'error', text: 'no such command' } }),
+      execute: async () => ({ ok: true, value: { result: { kind: 'error', text: 'no such grammar' } } }),
     })
-    await expect(registrations[0].options.inject().grantSessionPattern('s1', 'uv')).rejects.toThrow('no such command')
+    await expect(registrations[0].options.inject().grantSessionPattern('s1', 'uv')).rejects.toThrow('no such grammar')
+  })
+
+  it('surfaces a refused remote call as a rejection', async () => {
+    const { registrations } = createClient({
+      execute: async () => ({ ok: false, error: { code: 'unavailable', message: 'session gone' } }),
+    })
+    await expect(registrations[0].options.inject().grantSessionPattern('s1', 'uv')).rejects.toThrow('session gone')
+  })
+
+  it('names the plugin when the host command is missing', async () => {
+    const { registrations } = createClient({
+      execute: async () => ({ ok: true, value: undefined }),
+    })
+    await expect(registrations[0].options.inject().grantSessionPattern('s1', 'uv')).rejects.toThrow('command-permission plugin')
   })
 
   it('fails with the no-session message when no session holds the main view', async () => {

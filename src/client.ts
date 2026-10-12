@@ -131,6 +131,17 @@ window.__ModuleLoader__.load({
       cursor: 'pointer',
     }
 
+    /** Inverted (black-on-light) fill so the tier buttons read as actions. */
+    const tierButtonStyle: Record<string, string> = {
+      fontSize: '12px',
+      padding: '4px 10px',
+      borderRadius: '6px',
+      border: 'none',
+      background: 'var(--dsw-alias-text-default, #1d1d1f)',
+      color: 'var(--dsw-alias-surface-raised, #ffffff)',
+      cursor: 'pointer',
+    }
+
     const textareaStyle: Record<string, string> = {
       display: 'block',
       width: '100%',
@@ -157,8 +168,15 @@ window.__ModuleLoader__.load({
       if (carrier === undefined) {
         throw new Error(noSessionMessage)
       }
-      const execution = await ctx.remote.commands.execute(carrier.id, line, [])
-      const result = execution?.result
+      // The remote wraps the host execution: { ok:false, error } | { ok:true, value?: { result } }.
+      const response = await ctx.remote.commands.execute(carrier.id, line, [])
+      if (response?.ok !== true) {
+        throw new Error(response?.error?.message ?? 'command.execute failed')
+      }
+      if (response.value === undefined) {
+        throw new Error('unknown command /cmdperm — is the command-permission plugin enabled on the Host?')
+      }
+      const result = response.value.result
       if (result === undefined || result.kind !== 'success') {
         throw new Error(result?.text ?? 'command failed')
       }
@@ -206,14 +224,14 @@ window.__ModuleLoader__.load({
           tiers.map(pattern => h('button', {
             key: `session:${pattern}`,
             type: 'button',
-            style: buttonStyle,
+            style: tierButtonStyle,
             onClick: () => void click(pattern, false),
           }, t('allowSession', { pattern })))),
         h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 } },
           tiers.map(pattern => h('button', {
             key: `workspace:${pattern}`,
             type: 'button',
-            style: buttonStyle,
+            style: tierButtonStyle,
             onClick: () => void click(pattern, true),
           }, t('allowWorkspace', { pattern })))),
         error.length > 0
@@ -223,46 +241,23 @@ window.__ModuleLoader__.load({
 
     /* ----------------------------------------------- workspace menus/dialog */
 
+    /**
+     * Adds "Command permissions…" to the Workspace row's "…" menu. That menu
+     * (rename/delete) is hardcoded in ui-workspace with no slot, so this
+     * watches for its popup (a `role="menu"` portal) after a button click
+     * inside a Workspace row and appends our own `role="menuitem"` row, then
+     * closes the menu the way the Menu primitive's own Escape listener does.
+     */
     function WorkspaceMenus({ t }: any) {
-      const [menu, setMenu] = React.useState(null)
       const [dialog, setDialog] = React.useState(null)
+      const tRef = React.useRef(t)
+      tRef.current = t
 
-      React.useEffect(() => {
-        const onContextMenu = (event: MouseEvent) => {
-          const target = event.target as Element | null
-          const row = target?.closest?.('[data-row-key^="workspace:"]')
-          if (row == null) {
-            return
-          }
-          const key = row.getAttribute('data-row-key') ?? ''
-          const workspaceId = key.slice('workspace:'.length)
-          if (workspaceId.length === 0 || workspaceId === 'ungrouped') {
-            return
-          }
-          const view = ctx.workspaces.list.getSnapshot().items
-            .find((item: any) => String(item.workspaceId) === workspaceId)
-          if (view === undefined) {
-            return
-          }
-          event.preventDefault()
-          setDialog(null)
-          setMenu({ x: event.clientX, y: event.clientY, workspaceId, title: view.title, path: view.path })
-        }
-        document.addEventListener('contextmenu', onContextMenu)
-        return () => {
-          document.removeEventListener('contextmenu', onContextMenu)
-        }
-      }, [])
-
-      const openDialog = async () => {
-        if (menu === null) {
-          return
-        }
-        const target = menu
-        setMenu(null)
+      /** Load one workspace's lists into the dialog. */
+      async function loadDialog(target: { workspaceId: string; title: string; path: string }): Promise<void> {
         setDialog({ ...target, allow: '', deny: '', error: '', busy: true })
         try {
-          const payload: unknown = await runCommand(t('dialog.noSession'), `/cmdperm workspace ${target.workspaceId} list`)
+          const payload: unknown = await runCommand(tRef.current('dialog.noSession'), `/cmdperm workspace ${target.workspaceId} list`)
           const parsed = CommandPayloadSchema.safeParse(payload)
           const allow = parsed.success ? parsed.data.allow : []
           const deny = parsed.success ? parsed.data.deny : []
@@ -275,6 +270,79 @@ window.__ModuleLoader__.load({
             : current)
         }
       }
+
+      React.useEffect(() => {
+        /** The workspace whose row button was clicked last, while its menu may open. */
+        let pending: { workspaceId: string; title: string; path: string; at: number } | null = null
+
+        const onClick = (event: MouseEvent) => {
+          const target = event.target as Element | null
+          const button = target?.closest?.('button')
+          const row = button?.closest?.('[data-row-key^="workspace:"]')
+          if (row == null) {
+            return
+          }
+          // Only the "..." anchor (the row's first button) opens a menu; the
+          // new-session button must not arm the injection window.
+          if (row.querySelector('button') !== button) {
+            return
+          }
+          const workspaceId = (row.getAttribute('data-row-key') ?? '').slice('workspace:'.length)
+          const view = ctx.workspaces.list.getSnapshot().items
+            .find((item: any) => String(item.workspaceId) === workspaceId)
+          if (view === undefined) {
+            return
+          }
+          pending = { workspaceId, title: view.title, path: view.path, at: Date.now() }
+        }
+
+        const injectItem = (popup: Element) => {
+          if (pending === null || Date.now() - pending.at > 1000 || popup.querySelector('[data-cmdperm-item]') !== null) {
+            return
+          }
+          const target = pending
+          const item = document.createElement('button')
+          item.type = 'button'
+          item.setAttribute('role', 'menuitem')
+          item.setAttribute('data-cmdperm-item', target.workspaceId)
+          item.textContent = tRef.current('menu.item')
+          const rows = popup.querySelectorAll('button[role="menuitem"]')
+          if (rows.length > 0) {
+            // Match the first row (a neutral action), never the danger row.
+            item.className = rows[0].className
+          } else {
+            item.style.cssText = 'display:block;width:100%;text-align:left;padding:6px 10px;border:none;background:transparent;color:inherit;font:inherit;cursor:pointer'
+          }
+          item.addEventListener('click', (clickEvent) => {
+            clickEvent.stopPropagation()
+            void loadDialog(target)
+            document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+          })
+          popup.appendChild(item)
+        }
+
+        const observer = new MutationObserver((records) => {
+          for (const record of records) {
+            for (const node of record.addedNodes) {
+              if (!(node instanceof Element)) {
+                continue
+              }
+              const popup = node.matches('[role="menu"]') ? node : node.querySelector('[role="menu"]')
+              if (popup !== null) {
+                injectItem(popup)
+              }
+            }
+          }
+        })
+        observer.observe(document.body, { childList: true, subtree: true })
+        // Capture phase: the "..." anchor calls stopPropagation(), so a
+        // bubbling document listener would never see its clicks.
+        document.addEventListener('click', onClick, true)
+        return () => {
+          observer.disconnect()
+          document.removeEventListener('click', onClick, true)
+        }
+      }, [])
 
       const saveDialog = async () => {
         if (dialog === null) {
@@ -290,44 +358,6 @@ window.__ModuleLoader__.load({
       }
 
       const nodes: any[] = []
-      if (menu !== null) {
-        nodes.push(h('div', {
-          key: 'backdrop',
-          style: { position: 'fixed', inset: 0, zIndex: 1000 },
-          onMouseDown: () => {
-            setMenu(null)
-          },
-          onContextMenu: (event: MouseEvent) => {
-            event.preventDefault()
-            setMenu(null)
-          },
-        }))
-        nodes.push(h('div', {
-          key: 'menu',
-          role: 'menu',
-          style: {
-            position: 'fixed',
-            left: Math.max(4, Math.min(menu.x, window.innerWidth - 220)),
-            top: Math.max(4, Math.min(menu.y, window.innerHeight - 60)),
-            zIndex: 1001,
-            minWidth: '200px',
-            padding: '4px',
-            borderRadius: '8px',
-            border: '1px solid var(--dsw-alias-border-default, #8884)',
-            background: 'var(--dsw-alias-surface-raised, #fff)',
-            boxShadow: '0 4px 16px #0003',
-          },
-        },
-          h('div', {
-            style: { padding: '4px 8px', fontSize: '12px', opacity: 0.7, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-          }, menu.title),
-          h('button', {
-            type: 'button',
-            role: 'menuitem',
-            style: { ...buttonStyle, display: 'block', width: '100%', textAlign: 'left', border: 'none', background: 'transparent', padding: '6px 8px' },
-            onClick: () => void openDialog(),
-          }, t('menu.item'))))
-      }
       if (dialog !== null) {
         nodes.push(h('div', {
           key: 'dialog-backdrop',
@@ -404,7 +434,7 @@ window.__ModuleLoader__.load({
     /* --------------------------------------------------------------- wiring */
 
     return {
-      inject: ['slots', 'remote', 'sessions', 'uiSession', 'workspaces', 'locale'],
+      inject: ['slots', 'remote', 'remote.commands', 'sessions', 'uiSession', 'workspaces', 'locale'],
       apply(root: any) {
         ctx = root
         root.locale.register(NS, { en, ja })
